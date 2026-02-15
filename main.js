@@ -6,27 +6,29 @@ const H = 540;
 
 const world = {
   groundY: 410,
-  gravity: 1300,
-  runSpeed: 220,
-  jumpVel: 560,
+  gravity: 750,
+  runSpeed: 110,
+  jumpVel: 500,
   fallKillY: 560,
-  // 关卡长度（到福字）
+  // Level length (distance to the goal tile)
   finishX: 5600,
 };
 
 const colors = {
-  sky: 0x79c7ff,
-  far: 0x73b3f3,
-  grass: 0x52d273,
-  ground: 0x2b8f49,
-  dirt: 0x1e5e34,
-  river: 0x2b7bff,
-  hazard: 0x111c2f,
-  cloud: 0xffffff,
-  pony: 0xffe7a3,
-  pony2: 0xffb7c5,
-  obstacle: 0x1f2a44,
-  fuRed: 0xff2b2b,
+  sky: 0x360404,
+  far: 0x5b0a0a,
+  grass: 0xc0392b,
+  ground: 0x8c1a1a,
+  dirt: 0x5a0d0d,
+  river: 0x8c1a1a,
+  hazard: 0x3b0505,
+  cloud: 0xfff4d0,
+  pony: 0x8b5a2b,
+  pony2: 0xc58f50,
+  obstacle: 0x431313,
+  fuRed: 0xcf1e1e,
+  lanternGold: 0xffe08a,
+  lanternMid: 0xff6b6b,
 };
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
@@ -52,14 +54,14 @@ class Menu extends Phaser.Scene {
       color: "#ffffff",
     }).setOrigin(0.5);
 
-    const sub = this.add.text(W/2, H/2 + 10, "点击启用麦克风，然后拍手跳跃", {
+    const sub = this.add.text(W/2, H/2 + 10, "Click to enable the mic, then clap to jump", {
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       fontSize: "18px",
       color: "rgba(255,255,255,.85)"
     }).setOrigin(0.5);
 
     const btn = this.add.rectangle(W/2, H/2 + 80, 220, 52, 0xffffff, 1).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    const btnText = this.add.text(W/2, H/2 + 80, "启用麦克风", {
+    const btnText = this.add.text(W/2, H/2 + 80, "Enable Mic", {
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       fontSize: "18px",
       color: "#0b1020"
@@ -69,8 +71,8 @@ class Menu extends Phaser.Scene {
       this.scene.start("Play");
     });
 
-    // 允许键盘空格作为备用，避免你开发时被麦克风折磨
-    this.add.text(W/2, H - 40, "开发备用：空格也能跳", {
+    // Allow the keyboard spacebar as a backup so development isn't blocked by the mic
+    this.add.text(W/2, H - 40, "Dev shortcut: spacebar jumps", {
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       fontSize: "14px",
       color: "rgba(255,255,255,.55)"
@@ -118,7 +120,7 @@ class Play extends Phaser.Scene {
   }
 
   _setupInput() {
-    // 拍手检测，成功触发时只调用 this._jump()
+    // Clap detection — when it fires we only call this._jump()
     this.clap = new ClapDetector({
       sensitivity: 1.15,
       threshold: 0.055,
@@ -131,12 +133,12 @@ class Play extends Phaser.Scene {
       }
     });
 
-    // 启动麦克风
+    // Start the microphone input
     this.clap.start().catch(() => {
-      this._setMic("麦克风权限未开启。你仍可用空格测试。");
+      this._setMic("Microphone permission denied. You can still use the spacebar.");
     });
 
-    // 备用键盘
+    // Keyboard fallback
     this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
   }
 
@@ -146,7 +148,7 @@ class Play extends Phaser.Scene {
     this.physics.world.gravity.y = world.gravity;
     this.physics.world.setBounds(0, 0, world.finishX + 900, H);
 
-    // 背景视差层（纯色矩形模拟）
+    // Parallax background layers (just colored strips)
     this.bgFar = this.add.tileSprite(0, 140, world.finishX + 900, 220, null)
       .setOrigin(0, 0).setScrollFactor(0.25);
     this.bgMid = this.add.tileSprite(0, 280, world.finishX + 900, 220, null)
@@ -154,24 +156,24 @@ class Play extends Phaser.Scene {
 
     this._paintBackgroundStrips();
 
-    // 地面段（坑/河就是缺口）
+    // Ground segments (pits/rivers are represented by gaps)
     this.groundGroup = this.physics.add.staticGroup();
-    this.hazardRects = []; // 记录坑/河的 x 区间，用于判定掉落/越界
+    this.hazardRects = []; // Track gap x ranges to detect falls/out of bounds
     this._buildGround();
 
-    // 云平台
+    // Cloud platforms
     this.cloudGroup = this.physics.add.staticGroup();
     this._buildClouds();
 
-    // 障碍（草/花）
+    // Obstacles (grass/flowers)
     this.obstacleGroup = this.physics.add.staticGroup();
     this._buildObstacles();
 
-    // 终点福字
+    // Goal tile
     this.finish = this._makeFu(world.finishX, world.groundY - 110);
     this.physics.add.existing(this.finish, true);
 
-    // 小马
+    // Pony sprite
     this.pony = this._makePony(140, world.groundY - 40);
     this.physics.add.existing(this.pony);
     this.pony.body.setSize(28, 26, true);
@@ -182,47 +184,82 @@ class Play extends Phaser.Scene {
 
     this.pony.body.setVelocityX(world.runSpeed);
 
-    // 相机跟随
+    // Camera follow
     this.cameras.main.startFollow(this.pony, true, 0.12, 0.12);
     this.cameras.main.setDeadzone(160, 120);
 
-    // 碰撞：地面 + 云
+    // Collisions: ground + clouds
     this.physics.add.collider(this.pony, this.groundGroup);
     this.physics.add.collider(this.pony, this.cloudGroup);
 
-    // 终点触发
+    // Finish trigger
     this.physics.add.overlap(this.pony, this.finish, () => {
       if (this.gameEnded) return;
       this._win();
     });
 
-    // 障碍判定：进入障碍区间时，如果还在地上就结束；空中过则加分
+    // Obstacle detection: touching while grounded is bad, clearing mid-air yields points
     this.obstacleSensors = this._buildObstacleSensors();
   }
 
   _paintBackgroundStrips() {
-    // 直接用 Graphics 画两条视差带
+    // Use Graphics to paint two parallax strips
     const g1 = this.add.graphics().setScrollFactor(0.25);
     g1.fillStyle(colors.far, 1);
     g1.fillRect(0, 120, world.finishX + 900, 220);
 
     const g2 = this.add.graphics().setScrollFactor(0.5);
-    g2.fillStyle(0x6ed18c, 1);
+    g2.fillStyle(0x7a1010, 1);
     g2.fillRect(0, 300, world.finishX + 900, 240);
 
-    // 装饰点点（像素云/小点）
+    // Decorative glowing orbs to mimic lantern bokeh
     const deco = this.add.graphics().setScrollFactor(0.35);
-    deco.fillStyle(0xffffff, 0.85);
-    for (let i = 0; i < 90; i++) {
-      const x = 80 + i * 70;
-      const y = 70 + (i % 7) * 8;
-      deco.fillRect(x, y, 6, 3);
+    for (let i = 0; i < 110; i++) {
+      const x = 40 + i * 60;
+      const y = 80 + (i % 9) * 10;
+      const radius = 4 + (i % 3);
+      deco.fillStyle(i % 2 === 0 ? colors.lanternGold : colors.lanternMid, 0.4);
+      deco.fillCircle(x, y, radius);
+    }
+
+    // Lantern garlands closer to the camera
+    const lanterns = this.add.graphics().setScrollFactor(0.55);
+    lanterns.lineStyle(2, colors.lanternGold, 0.6);
+    for (let band = 0; band < 3; band++) {
+      const baseY = 140 + band * 70;
+      lanterns.beginPath();
+      lanterns.moveTo(0, baseY);
+      const cpX = (world.finishX + 900) / 2;
+      const cpY = baseY + 30;
+      const steps = 32;
+      let prevX = 0;
+      let prevY = baseY;
+      for (let t = 1; t <= steps; t++) {
+        const u = t / steps;
+        const bx = (1 - u) * (1 - u) * 0 + 2 * (1 - u) * u * cpX + u * u * (world.finishX + 900);
+        const by = (1 - u) * (1 - u) * baseY + 2 * (1 - u) * u * cpY + u * u * baseY;
+        lanterns.lineBetween(prevX, prevY, bx, by);
+        prevX = bx;
+        prevY = by;
+      }
+      lanterns.strokePath();
+      for (let lx = 40; lx < world.finishX + 900; lx += 180) {
+        const sway = Math.sin((lx + band * 50) * 0.01) * 10;
+        const ly = baseY + 12 + sway;
+        lanterns.fillStyle(colors.lanternMid, 0.9);
+        lanterns.fillEllipse(lx, ly, 24, 34);
+        lanterns.fillStyle(colors.lanternGold, 0.9);
+        lanterns.fillRect(lx - 4, ly - 22, 8, 6);
+        lanterns.fillRect(lx - 3, ly + 18, 6, 8);
+        lanterns.lineStyle(2, colors.lanternGold, 1);
+        lanterns.strokeEllipse(lx, ly, 24, 34);
+      }
     }
   }
 
   _buildGround() {
-    // 关卡地面：一段段 200 宽；随机留洞做坑/河
-    // 河用蓝色贴片画在背景层，地面缺口一样是致命
+    // Level ground: each 200px chunk could have been a pit/river (disabled for easy mode)
+    // Rivers were blue quads below; pits were dark voids
     const segmentW = 200;
     const baseY = world.groundY;
     const total = Math.ceil((world.finishX + 900) / segmentW);
@@ -238,9 +275,9 @@ class Play extends Phaser.Scene {
       let river = false;
 
       if (!nearStart && !nearFinish) {
-        const r = rng();
-        if (r < 0.14) gap = true;       // 坑
-        if (r >= 0.14 && r < 0.23) { gap = true; river = true; } // 河
+        // Easy mode: keep the ground solid everywhere
+        gap = false;
+        river = false;
       }
 
       if (!gap) {
@@ -271,19 +308,19 @@ class Play extends Phaser.Scene {
     const c = this.add.container(x, 0);
     const g = this.add.graphics();
 
-    // 上层草
+    // Grass layer
     g.fillStyle(colors.grass, 1);
     g.fillRect(0, y, w, 18);
 
-    // 下层土
+    // Soil layer
     g.fillStyle(colors.ground, 1);
     g.fillRect(0, y + 18, w, 70);
 
-    // 更深
+    // Deeper layer
     g.fillStyle(colors.dirt, 1);
     g.fillRect(0, y + 88, w, 140);
 
-    // 像素纹理点
+    // Pixel texture dots
     g.fillStyle(0x000000, 0.08);
     for (let i = 0; i < 40; i++) {
       g.fillRect((i * 23) % w, y + 26 + (i * 17) % 140, 3, 3);
@@ -291,22 +328,22 @@ class Play extends Phaser.Scene {
 
     c.add(g);
 
-    // static body 用 invisible rect
+    // Use an invisible rect as the static body
     const bodyRect = this.add.rectangle(w/2, y + 10, w, 28, 0x000000, 0).setOrigin(0.5);
     c.add(bodyRect);
     this.physics.add.existing(bodyRect, true);
-    // 让 container 作为静态体的视觉载体
+    // Keep the container as the visual for the static body
     c.setDepth(1);
-    bodyRect.body.setOffset(x, 0); // 不需要精确
+    bodyRect.body.setOffset(x, 0); // Doesn't need to be precise
 
-    // Phaser staticGroup 需要直接添加 GameObject
-    // 这里返回 bodyRect 作为碰撞体，视觉仍由 container 在同位置展示
+    // Phaser staticGroup needs direct GameObjects
+    // Return bodyRect as the collider, keep the container for visuals
     c.x = x;
     bodyRect.x = x + w/2;
-    bodyRect.y = 0; // y 已经在 rect 内
+    bodyRect.y = 0; // y is already captured inside the rect
     c.y = 0;
 
-    // 把视觉 container 跟随 rect
+    // Keep the visual container tracking the rect
     bodyRect._visual = c;
     bodyRect.preUpdate = function() {
       if (this._visual) this._visual.x = this.x - w/2;
@@ -319,14 +356,16 @@ class Play extends Phaser.Scene {
     const rng = this._mulberry32(7);
     for (let i = 0; i < 26; i++) {
       const x = 800 + i * 190 + Math.floor(rng() * 160);
-      const y = 190 + Math.floor(rng() * 140);
-      // 让部分云靠后段更密，给你“能跳上云”的体验
-      const isPlatform = rng() > 0.35;
+      const minY = world.groundY - 130; // lowered clouds so jumps always reach
+      const maxOffset = 40;
+      const y = minY + Math.floor(rng() * maxOffset);
+      // Denser, lower clouds later in the level to guarantee reachable platforms
+      const isPlatform = rng() > 0.05;
 
-      const cloud = this._makeCloud(x, y, isPlatform ? 120 : 90, isPlatform ? 26 : 22);
+      const cloud = this._makeCloud(x, y, isPlatform ? 150 : 110, isPlatform ? 34 : 26);
       this.cloudGroup.add(cloud);
 
-      // 如果不是平台，就把碰撞体做薄一点，几乎踩不到
+      // Non-platform clouds get a thin collider so you basically fall through
       if (!isPlatform) cloud.body.setSize(40, 6, true);
     }
   }
@@ -339,20 +378,20 @@ class Play extends Phaser.Scene {
     g.fillRect(x + 10, y + h - 6, w - 20, 3);
     g.setDepth(0);
 
-    // 用 invisible rect 作为碰撞体
+    // Use an invisible rect as the collider
     const r = this.add.rectangle(x + w/2, y + h/2, w, h, 0x000000, 0);
     this.physics.add.existing(r, true);
     r._visual = g;
     r.preUpdate = function() {
       if (this._visual) {
-        // 不移动，不需要同步
+        // Static cloud, nothing to sync
       }
     };
     return r;
   }
 
   _buildObstacles() {
-    // 草/花作为必须跳的“判定门”，视觉放在地面上
+    // Grass/flowers are jump gates sitting on the ground
     const rng = this._mulberry32(99);
 
     for (let x = 680; x < world.finishX - 260; x += 260) {
@@ -364,7 +403,7 @@ class Play extends Phaser.Scene {
       }
     }
 
-    // 终点前加几个连续障碍，让结尾更像“冲刺”
+    // Add a small obstacle sprint before the finish
     for (let i = 0; i < 5; i++) {
       this._spawnObstacle(world.finishX - 760 + i * 130, i % 2 === 0 ? "flower" : "grass");
     }
@@ -396,7 +435,7 @@ class Play extends Phaser.Scene {
     }
     g.setDepth(2);
 
-    // sensor rect：不做碰撞，只用于区间判定
+    // Sensor rect: no collisions, only used for interval checks
     const w = 54;
     const h = 52;
     const r = this.add.rectangle(x + 11, world.groundY - 26, w, h, 0x000000, 0);
@@ -408,7 +447,7 @@ class Play extends Phaser.Scene {
   }
 
   _buildObstacleSensors() {
-    // 这些 sensor 不走 physics overlap，直接用 x 区间判断更干净
+    // These sensors skip physics overlap—direct x-range checks are cleaner
     return this.obstacleGroup.getChildren();
   }
 
@@ -416,25 +455,27 @@ class Play extends Phaser.Scene {
     const c = this.add.container(x, y);
 
     const g = this.add.graphics();
-    // 身体
+    // Body
     g.fillStyle(colors.pony, 1);
-    g.fillRect(0, 10, 34, 18);
-    // 头
-    g.fillStyle(colors.pony, 1);
-    g.fillRect(22, 2, 16, 16);
-    // 鬃毛
+    g.fillRect(0, 10, 36, 18);
+    // Long neck
+    g.fillRect(20, 0, 8, 16);
+    // Head
+    g.fillRect(24, -6, 18, 18);
+    // Mane
     g.fillStyle(colors.pony2, 1);
-    g.fillRect(22, 0, 10, 6);
-    // 腿
+    g.fillRect(24, -8, 12, 8);
+    g.fillRect(18, -4, 8, 10);
+    // Legs
     g.fillStyle(0x2b2b2b, 1);
-    g.fillRect(6, 28, 6, 10);
-    g.fillRect(22, 28, 6, 10);
-    // 眼睛
+    g.fillRect(6, 28, 6, 12);
+    g.fillRect(24, 28, 6, 12);
+    // Eyes
     g.fillStyle(0x1a1a1a, 1);
-    g.fillRect(33, 8, 3, 3);
-    // 尾巴
+    g.fillRect(36, 0, 3, 3);
+    // Tail
     g.fillStyle(colors.pony2, 1);
-    g.fillRect(-6, 12, 6, 10);
+    g.fillRect(-6, 12, 7, 12);
 
     c.add(g);
     c.setDepth(3);
@@ -449,53 +490,105 @@ class Play extends Phaser.Scene {
     g.fillStyle(colors.fuRed, 1);
     g.fillRoundedRect(-70, -70, 140, 140, 18);
 
-    // 简化像素“福”字：不用字体，直接矩形拼
+    // Simplified lucky tile built with rectangles
     g.fillStyle(0xfff1d6, 1);
-    // 上横
+    // Top horizontal stroke
     g.fillRect(-34, -40, 68, 10);
-    // 中竖
+    // Middle vertical stroke
     g.fillRect(-6, -40, 12, 88);
-    // 左竖
+    // Left vertical stroke
     g.fillRect(-34, -40, 10, 88);
-    // 中横
+    // Middle horizontal stroke
     g.fillRect(-34, -2, 68, 10);
-    // 底横
+    // Bottom horizontal stroke
     g.fillRect(-34, 36, 68, 10);
-    // 右小竖
+    // Right mini vertical stroke
     g.fillRect(24, -2, 10, 58);
 
-    // 外边框暗角
+    // Outer rim shading
     g.fillStyle(0x000000, 0.12);
     g.fillRoundedRect(-70, -70, 140, 140, 18);
 
     c.add(g);
 
-    // 终点碰撞体
+    // Finish collider
     const r = this.add.rectangle(x, y, 120, 120, 0x000000, 0);
     r._visual = c;
     r.preUpdate = function() {
-      if (this._visual) { /* 不同步 */ }
+      if (this._visual) { /* Static, no sync needed */ }
     };
     return r;
+  }
+
+  _ensureFireworkTexture() {
+    const key = "firework-spark";
+    if (this.textures.exists(key)) return key;
+    const gfx = this.make.graphics({ x: 0, y: 0, add: false });
+    gfx.fillStyle(0xffffff, 1);
+    gfx.fillCircle(8, 8, 8);
+    gfx.generateTexture(key, 16, 16);
+    gfx.destroy();
+    return key;
+  }
+
+  _launchFireworks(cx, cy) {
+    const textureKey = this._ensureFireworkTexture();
+    const particles = this.add.particles(textureKey).setDepth(2100).setScrollFactor(0);
+    const palette = [0xfff1d6, colors.lanternGold, colors.lanternMid, 0xffffff];
+
+    for (let i = 0; i < 4; i++) {
+      const emitter = particles.createEmitter({
+        angle: { min: 0, max: 360 },
+        speed: { min: 140, max: 320 },
+        scale: { start: 0.6, end: 0 },
+        alpha: { start: 1, end: 0 },
+        lifespan: { min: 700, max: 1500 },
+        gravityY: 220,
+        blendMode: "ADD",
+        tint: palette[i % palette.length],
+        on: false,
+      });
+
+      this.time.addEvent({
+        delay: i * 300,
+        repeat: 2,
+        callback: () => {
+          emitter.explode(45, cx + Phaser.Math.Between(-140, 140), cy + Phaser.Math.Between(-120, -40));
+        }
+      });
+    }
+
+    this.time.addEvent({
+      delay: 4800,
+      callback: () => particles.destroy()
+    });
   }
 
   update(time, delta) {
     if (this.gameEnded) return;
 
-    // 备用：空格跳
+    // Keyboard backup: space to jump
     if (Phaser.Input.Keyboard.JustDown(this.space)) this._jump();
 
-    // 保持水平速度（避免落到云上摩擦导致减速）
+    // Force constant horizontal speed (cloud friction can slow you otherwise)
     this.pony.body.setVelocityX(world.runSpeed);
 
-    // 障碍判定：进入 sensor 区间且人在地上 -> Game Over；空中过 -> 加分
+    // Obstacle handling: grounded contact hurts, airborne clears reward you
     for (const s of this.obstacleSensors) {
       if (!s || this.passed.has(s)) continue;
       const px = this.pony.x;
       if (px >= s.sensorX1 && px <= s.sensorX2) {
         if (this.pony.body.blocked.down) {
-          this._gameOver(`撞上${s.kind === "grass" ? "草" : "花"}，需要跳。`);
-          return;
+          if (s.kind === "grass") {
+            if (!this.passed.has(s)) {
+              this.score = Math.max(0, this.score - 40);
+            }
+            this.combo = 0;
+            this.passed.add(s);
+          } else {
+            this._gameOver("Hit a flower—jump to clear obstacles.");
+            return;
+          }
         } else {
           this.passed.add(s);
           this.combo = clamp(this.combo + 1, 0, 999);
@@ -504,29 +597,29 @@ class Play extends Phaser.Scene {
       }
     }
 
-    // 掉落判定：y 太低直接结束
+    // Falling check: if y too low, end the run
     if (this.pony.y > world.fallKillY) {
-      this._gameOver("掉下去了。");
+      this._gameOver("You fell.");
       return;
     }
 
-    // 距离分：每帧按速度加一点
+    // Distance score: add a tiny bit each frame based on speed
     this.score += (world.runSpeed * (delta / 1000)) * 0.06;
 
-    // 走到终点附近时，给一点“冲刺提示”
+    // Once near the finish, show a sprint reminder
     const remain = Math.max(0, world.finishX - this.pony.x);
     this.hud.setText(`Score: ${Math.floor(this.score)}    Combo: ${this.combo}`);
-    this.hud2.setText(remain < 900 ? `终点剩余: ${Math.floor(remain)}px` : `拍手跳跃。掉坑/河 Game Over。`);
+    this.hud2.setText(remain < 900 ? `Distance to goal: ${Math.floor(remain)}px` : `Clap (or press space) to jump. Falling still ends the run.`);
   }
 
   _jump() {
     if (this.gameEnded) return;
     const body = this.pony.body;
 
-    // 只允许在地面或云上起跳
+    // Only jump when grounded (ground or cloud)
     if (body.blocked.down) {
       body.setVelocityY(-world.jumpVel);
-      // 起跳时如果连击之前中断，重置会更干净：这里选择不重置，让玩家追求“空中连跳”更爽
+      // Let combo persist between jumps for satisfying aerial streaks
     }
   }
 
@@ -535,14 +628,14 @@ class Play extends Phaser.Scene {
     this.pony.body.setVelocity(0, 0);
     this.pony.body.allowGravity = false;
 
-    this._setMic("通关。");
+    this._setMic("Cleared!");
 
     const cam = this.cameras.main;
     const cx = cam.scrollX + W / 2;
     const cy = cam.scrollY + H / 2;
 
     const panel = this.add.rectangle(cx, cy, 520, 220, 0x000000, 0.45).setScrollFactor(0).setDepth(2000);
-    const t1 = this.add.text(cx, cy - 50, "到达福字，通关", {
+    const t1 = this.add.text(cx, cy - 50, "You reached the lucky tile!", {
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       fontSize: "26px",
       color: "#ffffff"
@@ -554,11 +647,13 @@ class Play extends Phaser.Scene {
       color: "rgba(255,255,255,.9)"
     }).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
 
-    const t3 = this.add.text(cx, cy + 54, "点击重新开始", {
+    const t3 = this.add.text(cx, cy + 54, "Click to restart", {
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       fontSize: "16px",
       color: "rgba(255,255,255,.8)"
     }).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
+
+    this._launchFireworks(cx, cy - 80);
 
     this.input.once("pointerdown", () => this.scene.restart());
 
@@ -574,9 +669,9 @@ class Play extends Phaser.Scene {
     this.gameEnded = true;
     this.combo = 0;
 
-    this._setMic("Game Over。");
+    this._setMic("Game Over.");
 
-    // 停止物理
+    // Freeze physics
     this.pony.body.setVelocity(0, 0);
     this.pony.body.allowGravity = false;
 
@@ -603,7 +698,7 @@ class Play extends Phaser.Scene {
       color: "rgba(255,255,255,.9)"
     }).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
 
-    const t4 = this.add.text(cx, cy + 74, "点击重新开始", {
+    const t4 = this.add.text(cx, cy + 74, "Click to restart", {
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       fontSize: "16px",
       color: "rgba(255,255,255,.8)"
