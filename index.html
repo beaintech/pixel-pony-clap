@@ -1,13 +1,14 @@
 <!-- index.html -->
 <!doctype html>
-<html lang="zh">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pixel Pony Clap Jump</title>
   <style>
-    html, body { margin: 0; padding: 0; background: #0b1020; height: 100%; overflow: hidden; }
-    #app { width: 100%; height: 100%; display: grid; place-items: center; }
+    html, body { margin: 0; padding: 0; background: #200b0b; height: 100%; overflow: hidden; }
+    #app { width: 100%; height: 100%; display: block; }
+    #app canvas { width: 100% !important; height: 100% !important; display: block; }
     .hint {
       position: fixed; left: 12px; bottom: 12px; right: 12px;
       font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -30,7 +31,7 @@
   <div id="app"></div>
 
   <div class="hint">
-    <b>玩法：</b>点击“启用麦克风”，然后拍手触发跳跃。掉进河/坑就 Game Over。跳到最后的大“福”字算通关。
+    <b>How to play:</b> Click "Enable Mic", then clap (or press space) to jump. Falling into holes or water ends the run. Reach the giant lucky tile to win.
     <span id="micState" style="margin-left:10px; opacity:.9;"></span>
   </div>
 

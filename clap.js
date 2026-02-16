@@ -46,7 +46,7 @@ export class ClapDetector {
     this._src.connect(this._analyser);
     this._buf = new Float32Array(this._analyser.fftSize);
 
-    this.stateText(`麦克风已启用，拍手跳跃。敏感度=${this.sensitivity.toFixed(2)}`);
+    this.stateText(`Mic enabled. Clap to jump. Sensitivity=${this.sensitivity.toFixed(2)}`);
     this._tick();
   }
 
@@ -62,7 +62,7 @@ export class ClapDetector {
     this._src = null;
     this._analyser = null;
     this._buf = null;
-    this.stateText(`麦克风已关闭。`);
+    this.stateText(`Mic disabled.`);
   }
 
   setSensitivity(v) {
