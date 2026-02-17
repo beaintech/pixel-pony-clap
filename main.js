@@ -15,6 +15,8 @@ const world = {
   finishX: 6400,
 };
 
+const baseWorld = { ...world };
+
 const colors = {
   sky: 0x360404,
   far: 0x5b0a0a,
@@ -82,6 +84,35 @@ const tuning = {
   sceneSwitchScore: 1200,
 };
 
+const baseTuning = JSON.parse(JSON.stringify(tuning));
+
+const levels = [
+  {
+    key: "level-1",
+    label: "Level 1 — Meadow Warmup",
+    runSpeed: 240,
+    finishX: 5600,
+    platformSpacing: { min: 120, max: 185 },
+    hazards: { gapChance: 0.28, waterChance: 0.5 },
+  },
+  {
+    key: "level-2",
+    label: "Level 2 — Lantern Dash",
+    runSpeed: 280,
+    finishX: 6800,
+    platformSpacing: { min: 110, max: 175 },
+    hazards: { gapChance: 0.34, waterChance: 0.6 },
+  },
+  {
+    key: "level-3",
+    label: "Level 3 — Night Sprint",
+    runSpeed: 320,
+    finishX: 7600,
+    platformSpacing: { min: 100, max: 165 },
+    hazards: { gapChance: 0.4, waterChance: 0.68 },
+  },
+];
+
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
 class Boot extends Phaser.Scene {
@@ -140,7 +171,10 @@ class Menu extends Phaser.Scene {
 }
 
 class Play extends Phaser.Scene {
-  constructor() { super("Play"); }
+  constructor() {
+    super("Play");
+    this.levelIndex = 0;
+  }
 
   create() {
     this.score = 0;
@@ -148,7 +182,12 @@ class Play extends Phaser.Scene {
     this.passed = new Set();
     this.gameEnded = false;
 
+    this.levelIndex = clamp(this.levelIndex ?? 0, 0, levels.length - 1);
+    this.levelConfig = levels[this.levelIndex] || levels[0];
+    this._applyLevelConfig();
+
     this._setupUI();
+    this._updateLevelIndicator();
     this._setupWorld();
     this._setupInput();
   }
@@ -173,7 +212,21 @@ class Play extends Phaser.Scene {
       padding: { x: 10, y: 8 }
     }).setScrollFactor(0).setDepth(999);
 
+    this.levelHud = this.add.text(14, 102, "", {
+      fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+      fontSize: "14px",
+      color: "#ffffff",
+      backgroundColor: "rgba(0,0,0,.55)",
+      padding: { x: 10, y: 6 }
+    }).setScrollFactor(0).setDepth(999);
+
     this._setMic = setMic;
+  }
+
+  _updateLevelIndicator() {
+    if (!this.levelHud) return;
+    const label = this.levelConfig?.label || "Level ?";
+    this.levelHud.setText(`Level: ${label}`);
   }
 
   _setupInput() {
@@ -197,6 +250,38 @@ class Play extends Phaser.Scene {
 
     // Keyboard fallback
     this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+  }
+
+  _applyLevelConfig() {
+    const cfg = this.levelConfig || levels[0];
+    world.runSpeed = baseWorld.runSpeed;
+    world.finishX = baseWorld.finishX;
+    tuning.platform.spacing.min = baseTuning.platform.spacing.min;
+    tuning.platform.spacing.max = baseTuning.platform.spacing.max;
+    tuning.hazards.gapChance = baseTuning.hazards.gapChance;
+    tuning.hazards.waterChance = baseTuning.hazards.waterChance;
+
+    if (!cfg) return;
+    if (typeof cfg.runSpeed === "number") world.runSpeed = cfg.runSpeed;
+    if (typeof cfg.finishX === "number") world.finishX = cfg.finishX;
+
+    if (cfg.platformSpacing) {
+      if (typeof cfg.platformSpacing.min === "number") {
+        tuning.platform.spacing.min = cfg.platformSpacing.min;
+      }
+      if (typeof cfg.platformSpacing.max === "number") {
+        tuning.platform.spacing.max = cfg.platformSpacing.max;
+      }
+    }
+
+    if (cfg.hazards) {
+      if (typeof cfg.hazards.gapChance === "number") {
+        tuning.hazards.gapChance = cfg.hazards.gapChance;
+      }
+      if (typeof cfg.hazards.waterChance === "number") {
+        tuning.hazards.waterChance = cfg.hazards.waterChance;
+      }
+    }
   }
 
   _setupWorld() {
