@@ -156,7 +156,7 @@ class Menu extends Phaser.Scene {
     }).setOrigin(0.5);
 
     btn.on("pointerdown", async () => {
-      this.scene.start("Play");
+      this.scene.start("Play", { levelIndex: 0 });
     });
 
     // Allow the keyboard spacebar as a backup so development isn't blocked by the mic
@@ -174,6 +174,11 @@ class Play extends Phaser.Scene {
   constructor() {
     super("Play");
     this.levelIndex = 0;
+  }
+
+  init(data = {}) {
+    const nextLevel = typeof data.levelIndex === "number" ? data.levelIndex : 0;
+    this.levelIndex = clamp(nextLevel, 0, levels.length - 1);
   }
 
   create() {
@@ -1162,6 +1167,9 @@ _makePixelText(text, x, y, opts = {}) {
 
     const cx = this.scale.width / 2;
     const cy = this.scale.height / 2;
+    const hasNextLevel = this.levelIndex < levels.length - 1;
+    const nextLevelIndex = hasNextLevel ? this.levelIndex + 1 : 0;
+    const nextLabel = levels[nextLevelIndex]?.label || levels[0].label;
 
     // 先停掉跟随，排除 camera 还在动导致你以为“没显示”
     this.cameras.main.stopFollow();
@@ -1203,6 +1211,28 @@ try {
 } catch (e) {
   console.error("firework error:", e);
 }
+
+    const nextMessage = hasNextLevel ? `Next up: ${nextLabel}` : "All levels cleared! Click to restart Level 1.";
+    const nextText = this.add.text(cx, cy + 60, nextMessage, {
+      fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+      fontSize: "18px",
+      color: "#ffffff"
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10000003);
+
+    if (hasNextLevel) {
+      nextText.setAlpha(0);
+      this.tweens.add({
+        targets: nextText,
+        alpha: { from: 0, to: 1 },
+        duration: 240,
+        ease: "Sine.easeOut"
+      });
+      this.time.delayedCall(2600, () => {
+        this.scene.restart({ levelIndex: nextLevelIndex });
+      });
+    } else {
+      this.input.once("pointerdown", () => this.scene.restart({ levelIndex: 0 }));
+    }
   }
 
   _gameOver(reason) {
@@ -1244,7 +1274,7 @@ const cy = 70;
       color: "rgba(255,255,255,.8)"
     }).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
 
-    this.input.once("pointerdown", () => this.scene.restart());
+    this.input.once("pointerdown", () => this.scene.restart({ levelIndex: this.levelIndex }));
 
     this.tweens.add({
       targets: [panel, t1, t2, t3, t4],
